@@ -1,0 +1,55 @@
+install.packages('ISLR')
+library(ISLR)
+data <- ISLR::Default
+View(data)
+
+# Creating Training/Test samples 70/30 split
+sample<-sample(c(TRUE,FALSE),nrow(data),replace = TRUE,prob = c(0.7,0.3))
+train<-data[sample,]
+test<-data[!sample,]
+
+# Fit logistic regression model
+# Use general linear model (glm) and specify family as binomial so R will fit a logistic regression model to the dataset
+model<-glm(default~student+balance+income,family = 'binomial',data = train)
+# To disable scientific notation
+options(scipen = 999)
+summary(model)
+# Since student status and balance have low p-values then they are considered important predictors
+
+# Assessing model fit
+# When looking at fit, if value is close to 0 then it has no predictive power. Values over .40 indicate a good fit 
+pscl::pR2(model)['McFadden']
+# Since value is over .40 then it indicate a good fit
+
+# Use model to make predictions
+# We want to define an individual
+new<-data.frame(balance = 1400,income = 2000,student = c('Yes','No'))
+# Predict probability of defaulting
+predict(model,new,type = 'response')
+# If student then probability of defaulting is 2.6%. If not student then probability is 5.1%
+# Now to calculate for entire model
+predicted<-predict(model,test,type = 'response')
+
+# Model diagnostics
+# Any person with probability of default > 0.5 will be predicted as a default
+# We want to see if was can optimize this
+install.packages('InformationValue')
+library(InformationValue)
+# Need to convert yes and no to 1/0
+test$default<-ifelse(test$default == 'Yes',1,0)
+optimal<-optimalCutoff(test$default,predicted)[1]
+optimal
+# Optimal cutoff is .38 so anything over this will be considered a default
+
+# We want to create a confusion matrix to show our predictions compared to actual defaults
+confusionMatrix(test$default,predicted)
+# We can also calculate true positive rate and total misclassification error
+sensitivity(test$default,predicted)
+specificity(test$default,predicted)
+misClassError(test$default,predicted,threshold = optimal)
+# Misclassification error is 3.2% so pretty good
+
+# ROC plot
+# The higher the AUC the better
+plotROC(test$default,predicted)
+# AUC is 93% our model is accurate
